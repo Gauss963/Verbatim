@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AVKit
 
 #if os(macOS)
 import AppKit
@@ -291,8 +292,10 @@ struct ContentView: View {
                 }
 
                 if !model.transcript.isEmpty {
-                    PlaybackControlsView(
+                    MediaPlaybackView(
                         title: model.playbackTitle,
+                        player: model.playback.player,
+                        showsVideo: model.playbackShowsVideo,
                         currentTime: model.playback.currentTime,
                         duration: model.playback.duration,
                         isPlaying: model.playback.isPlaying,
@@ -370,8 +373,10 @@ struct ContentView: View {
     }
 }
 
-private struct PlaybackControlsView: View {
+private struct MediaPlaybackView: View {
     let title: String
+    let player: AVPlayer
+    let showsVideo: Bool
     let currentTime: TimeInterval
     let duration: TimeInterval
     let isPlaying: Bool
@@ -379,39 +384,52 @@ private struct PlaybackControlsView: View {
     let onSeekFraction: (Double) -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onPlayPause) {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .frame(width: 24, height: 24)
+        VStack(alignment: .leading, spacing: 10) {
+            if showsVideo {
+                VideoPlayer(player: player)
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(maxWidth: 320)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.secondary.opacity(0.18))
+                    }
             }
-            .buttonStyle(.borderedProminent)
-            .clipShape(Circle())
-            .help(isPlaying ? "Pause" : "Play")
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 8) {
-                    Text(title)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Text("\(formatted(currentTime)) / \(formatted(duration))")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Button(action: onPlayPause) {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        .frame(width: 24, height: 24)
                 }
+                .buttonStyle(.borderedProminent)
+                .clipShape(Circle())
+                .help(isPlaying ? "Pause" : "Play")
 
-                Slider(
-                    value: Binding(
-                        get: {
-                            guard duration > 0 else { return 0 }
-                            return min(1, max(0, currentTime / duration))
-                        },
-                        set: { onSeekFraction($0) }
-                    ),
-                    in: 0...1
-                )
-                .disabled(duration <= 0)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 8) {
+                        Label(title, systemImage: showsVideo ? "film" : "waveform")
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        Text("\(formatted(currentTime)) / \(formatted(duration))")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: {
+                                guard duration > 0 else { return 0 }
+                                return min(1, max(0, currentTime / duration))
+                            },
+                            set: { onSeekFraction($0) }
+                        ),
+                        in: 0...1
+                    )
+                    .disabled(duration <= 0)
+                }
             }
         }
         .padding(12)

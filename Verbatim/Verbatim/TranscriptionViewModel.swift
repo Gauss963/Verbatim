@@ -91,6 +91,12 @@ final class TranscriptionViewModel {
         return currentURL.lastPathComponent
     }
 
+    var playbackShowsVideo: Bool {
+        guard let currentURL = playback.currentURL else { return false }
+
+        return ["mp4", "mov", "m4v"].contains(currentURL.pathExtension.lowercased())
+    }
+
     var activeSegmentID: UUID? {
         guard let currentURL = playback.currentURL else { return nil }
 

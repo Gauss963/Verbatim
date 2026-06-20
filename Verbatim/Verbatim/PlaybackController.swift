@@ -9,7 +9,7 @@ final class PlaybackController {
     var duration: TimeInterval = 0
     var isPlaying = false
 
-    private let player = AVPlayer()
+    let player = AVPlayer()
     private var timeObserver: Any?
 
     init() {
