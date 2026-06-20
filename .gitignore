@@ -7,5 +7,6 @@ DerivedData/
 *.xcscmblueprint
 build/
 dist/
+release/
 .swiftpm/
 Verbatim/Verbatim/models/*.bin
