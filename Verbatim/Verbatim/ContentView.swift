@@ -133,6 +133,19 @@ struct ContentView: View {
                 .controlSize(.large)
                 .disabled(model.isTranscribing)
                 .help("Add files")
+
+#if os(macOS)
+                Button {
+                    model.addFiles(VoiceMemoImporter.chooseRecordings())
+                } label: {
+                    Image(systemName: "mic")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(model.isTranscribing)
+                .help("Add from Voice Memos")
+#endif
             }
 
             VStack(alignment: .leading, spacing: 6) {
