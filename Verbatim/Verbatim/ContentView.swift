@@ -49,7 +49,7 @@ struct ContentView: View {
     }
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             sidebarHeader
 
             dropZone
@@ -73,14 +73,11 @@ struct ContentView: View {
                 .frame(maxHeight: .infinity, alignment: .top)
 
             if let status = model.environmentStatus {
-                Label(status.message, systemImage: status.icon)
-                    .font(.footnote)
-                    .foregroundStyle(status.tint)
-                    .fixedSize(horizontal: false, vertical: true)
+                environmentStatusView(status)
             }
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 24)
+        .padding(.bottom, 18)
         .padding(.top, sidebarTopPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(sidebarBackground)
@@ -90,12 +87,16 @@ struct ContentView: View {
     }
 
     private var sidebarHeader: some View {
-        HStack(spacing: 10) {
-            Image("VerbatimMark")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 30, height: 30)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.14))
+
+                Image(systemName: "waveform")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(.tint)
+            }
+            .frame(width: 34, height: 34)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Verbatim")
@@ -106,6 +107,29 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func environmentStatusView(_ status: EnvironmentStatus) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Image(systemName: status.icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(status.tint)
+                .frame(width: 14)
+
+            Text(status.message)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(status.tint)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(panelBackground.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(status.tint.opacity(0.16), lineWidth: 1)
+        }
     }
 
     private var transcriptionControls: some View {
@@ -233,7 +257,7 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 22)
         .background {
             RoundedRectangle(cornerRadius: 8)
                 .fill(isDropTargeted ? Color.accentColor.opacity(0.13) : panelBackground)
@@ -355,7 +379,7 @@ struct ContentView: View {
 
     private var sidebarTopPadding: CGFloat {
 #if os(macOS)
-        72
+        42
 #else
         24
 #endif
