@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var isDropTargeted = false
     @State private var isFileImporterPresented = false
     @State private var isMobileTranscriptPresented = false
+    @State private var mobileTranscriptDetent: PresentationDetent = .large
 
     var body: some View {
         rootLayout
@@ -93,7 +94,7 @@ struct ContentView: View {
                     panelBackground: panelBackground,
                     windowBackground: windowBackground
                 )
-                .presentationDetents([.fraction(0.18), .medium, .large])
+                .presentationDetents([.fraction(0.18), .medium, .large], selection: $mobileTranscriptDetent)
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.regularMaterial)
             }
@@ -252,12 +253,14 @@ struct ContentView: View {
         .padding(.bottom, 10)
         .contentShape(Rectangle())
         .onTapGesture {
+            mobileTranscriptDetent = .large
             isMobileTranscriptPresented = true
         }
         .gesture(
             DragGesture(minimumDistance: 12)
                 .onEnded { value in
                     if value.translation.height < -24 {
+                        mobileTranscriptDetent = .large
                         isMobileTranscriptPresented = true
                     }
                 }
