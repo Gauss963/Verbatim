@@ -138,8 +138,16 @@ final class TranscriptionViewModel {
 
     func addFiles(_ urls: [URL]) {
         let supportedExtensions = Set(["mp3", "mp4", "m4a", "wav", "aiff", "aif", "mov", "aac", "flac"])
-        let newFiles = urls
-            .filter { supportedExtensions.contains($0.pathExtension.lowercased()) }
+        let playableURLs = urls
+            .compactMap { url -> URL? in
+                guard supportedExtensions.contains(url.pathExtension.lowercased()) else {
+                    return nil
+                }
+
+                return try? MediaImportStore.localPlayableURL(for: url)
+            }
+
+        let newFiles = playableURLs
             .filter { candidate in !files.contains { $0.url == candidate } }
             .map { TranscriptFile(url: $0) }
 
