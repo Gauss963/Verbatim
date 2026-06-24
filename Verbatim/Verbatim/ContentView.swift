@@ -9,13 +9,15 @@ import UIKit
 #endif
 
 struct ContentView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model = TranscriptionViewModel()
     @State private var isDropTargeted = false
     @State private var isFileImporterPresented = false
+    @State private var isMobileTranscriptPresented = false
 
     var body: some View {
         rootLayout
-            .frame(minWidth: 980, minHeight: 620)
+            .applyDesktopMinimumFrame()
             .fileImporter(
                 isPresented: $isFileImporterPresented,
                 allowedContentTypes: [.audio, .movie],
@@ -39,14 +41,229 @@ struct ContentView: View {
         }
         .background(windowBackground)
 #else
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 440)
-        } detail: {
-            transcriptPane
+        if horizontalSizeClass == .compact {
+            mobileRootLayout
+        } else {
+            NavigationSplitView {
+                sidebar
+                    .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 440)
+            } detail: {
+                transcriptPane
+            }
         }
 #endif
     }
+
+#if !os(macOS)
+    private var mobileRootLayout: some View {
+        NavigationStack {
+            ZStack(alignment: .bottom) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        mobileHeader
+
+                        mobileImportCard
+
+                        mobileSettingsSection
+
+                        transcriptionControls
+
+                        queueSection
+
+                        if let status = model.environmentStatus {
+                            environmentStatusView(status)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 18)
+                    .padding(.bottom, 124)
+                }
+                .background(windowBackground)
+                .navigationBarTitleDisplayMode(.inline)
+
+                mobileTranscriptCard
+            }
+            .task {
+                model.refreshEnvironmentStatus()
+            }
+            .sheet(isPresented: $isMobileTranscriptPresented) {
+                MobileTranscriptSheet(
+                    model: model,
+                    segments: transcriptDisplaySegments,
+                    panelBackground: panelBackground,
+                    windowBackground: windowBackground
+                )
+                .presentationDetents([.fraction(0.18), .medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.regularMaterial)
+            }
+        }
+    }
+
+    private var mobileHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.16))
+
+                    Image(systemName: "waveform")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.tint)
+                }
+                .frame(width: 44, height: 44)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Verbatim")
+                        .font(.largeTitle.bold())
+                        .lineLimit(1)
+                    Text(model.outputSubtitle)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+    }
+
+    private var mobileImportCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.14))
+
+                    Image(systemName: "tray.and.arrow.down")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(.tint)
+                }
+                .frame(width: 48, height: 48)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Add media")
+                        .font(.headline)
+                    Text("MP3, MP4, M4A, WAV, MOV")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Button {
+                isFileImporterPresented = true
+            } label: {
+                Label("Choose Files", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+        .padding(16)
+        .background(panelBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1)
+        }
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            model.acceptDrop(providers)
+        }
+    }
+
+    private var mobileSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Language")
+                    .font(.headline)
+
+                Picker("Language", selection: $model.language) {
+                    ForEach(TranscriptLanguage.allCases) { language in
+                        Text(language.title).tag(language)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Model")
+                    .font(.headline)
+
+                Picker("Model", selection: $model.selectedModel) {
+                    ForEach(WhisperModel.allCases) { whisperModel in
+                        Text(whisperModel.title).tag(whisperModel)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(model.isTranscribing)
+
+                Text(model.selectedModel.shortDetail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .background(panelBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1)
+        }
+    }
+
+    private var mobileTranscriptCard: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.16))
+
+                Image(systemName: model.playbackShowsVideo ? "film" : "text.alignleft")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.tint)
+            }
+            .frame(width: 48, height: 48)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(model.transcript.isEmpty ? "No transcript yet" : model.playbackTitle)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(model.transcript.isEmpty ? "Pull up after transcription" : "Pull up for synced transcript")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Button(action: model.playPauseTranscript) {
+                Image(systemName: model.playback.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.title3.weight(.bold))
+                    .frame(width: 38, height: 38)
+            }
+            .buttonStyle(.plain)
+            .disabled(model.transcript.isEmpty)
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 24, x: 0, y: 10)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isMobileTranscriptPresented = true
+        }
+        .gesture(
+            DragGesture(minimumDistance: 12)
+                .onEnded { value in
+                    if value.translation.height < -24 {
+                        isMobileTranscriptPresented = true
+                    }
+                }
+        )
+    }
+#endif
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -428,6 +645,106 @@ struct ContentView: View {
 #endif
     }
 }
+
+private extension View {
+    @ViewBuilder
+    func applyDesktopMinimumFrame() -> some View {
+#if os(macOS)
+        frame(minWidth: 980, minHeight: 620)
+#else
+        self
+#endif
+    }
+}
+
+#if !os(macOS)
+private struct MobileTranscriptSheet: View {
+    let model: TranscriptionViewModel
+    let segments: [TranscriptSegment]
+    let panelBackground: Color
+    let windowBackground: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sheetHeader
+
+            if !model.transcript.isEmpty {
+                MediaPlaybackView(
+                    title: model.playbackTitle,
+                    player: model.playback.player,
+                    showsVideo: model.playbackShowsVideo,
+                    currentTime: model.playback.currentTime,
+                    duration: model.playback.duration,
+                    isPlaying: model.playback.isPlaying,
+                    onPlayPause: model.playPauseTranscript,
+                    onSeekFraction: model.seekPlayback(to:)
+                )
+                .padding(.horizontal, 18)
+                .padding(.bottom, 14)
+            }
+
+            Divider()
+                .opacity(0.45)
+
+            ZStack {
+                if model.transcript.isEmpty {
+                    ContentUnavailableView {
+                        Label("No transcript yet", systemImage: "text.alignleft")
+                    } description: {
+                        Text("Add a file, choose a model, then start transcription.")
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    LyricsTranscriptView(
+                        segments: segments,
+                        activeSegmentID: model.activeSegmentID,
+                        onSeek: model.seek(to:)
+                    )
+                }
+            }
+        }
+        .background(windowBackground)
+    }
+
+    private var sheetHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.16))
+
+                Image(systemName: model.playbackShowsVideo ? "film" : "waveform")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.tint)
+            }
+            .frame(width: 48, height: 48)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Transcript")
+                    .font(.title2.bold())
+                Text(model.transcript.isEmpty ? model.outputSubtitle : model.playbackTitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Button {
+                Clipboard.copy(model.transcript)
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(.bordered)
+            .disabled(model.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+        .background(panelBackground.opacity(0.55))
+    }
+}
+#endif
 
 private struct MediaPlaybackView: View {
     let title: String
