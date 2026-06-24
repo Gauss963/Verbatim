@@ -1,13 +1,13 @@
 # Verbatim
 
-Verbatim is a native SwiftUI app for local audio and video transcription with Whisper large-v3.
+Verbatim is a native SwiftUI app for local audio and video transcription with selectable Whisper models.
 
 The app is designed for private, offline-first transcription: media files stay on the device, the Whisper model runs locally, and generated transcripts can be reviewed, copied, and played back alongside the original audio or video.
 
 ## Features
 
 - Native SwiftUI macOS interface.
-- Local Whisper large-v3 transcription.
+- Local Whisper transcription with Base, Small, and Large v3 model choices.
 - Drag and drop audio or video files into the queue.
 - File picker support for common media formats.
 - Voice Memos picker shortcut on macOS.
@@ -18,7 +18,7 @@ The app is designed for private, offline-first transcription: media files stay o
 - Apple Music-style transcript view with large scrolling text.
 - Audio playback synced with highlighted transcript segments.
 - Video preview when the selected transcript source is a video file.
-- Bundled `whisper.framework` and `ggml-large-v3.bin` for a self-contained app build.
+- Bundled `whisper.framework` and Whisper model files for a self-contained app build.
 
 ## Supported Inputs
 
@@ -40,8 +40,8 @@ For development:
 
 - macOS 15.7 or newer, based on the current Xcode deployment target.
 - Xcode 26 or newer recommended.
-- Apple silicon Mac recommended for large-v3 local inference.
-- About 3 GB of local disk space for the bundled large-v3 model.
+- Apple silicon Mac recommended for Large v3 local inference.
+- About 3.6 GB of local disk space for the bundled Base, Small, and Large v3 models.
 
 For people using a packaged build:
 
@@ -64,6 +64,8 @@ Verbatim/
     VoiceMemoImporter.swift
     Assets.xcassets/
     models/
+      ggml-base.bin
+      ggml-small.bin
       ggml-large-v3.bin
 Vendor/
   whisper.xcframework
@@ -73,17 +75,27 @@ scripts/
 
 ## Model And Binary Assets
 
-The app expects Whisper large-v3 at:
+The app ships with three multilingual Whisper models:
 
 ```text
+Verbatim/Verbatim/models/ggml-base.bin
+Verbatim/Verbatim/models/ggml-small.bin
 Verbatim/Verbatim/models/ggml-large-v3.bin
 ```
 
-That model is not committed to git because it is far larger than GitHub's normal repository file limit. GitHub blocks files larger than 100 MB in regular git history, and release assets are the right place for distributable binaries.
+These models are not committed to git because they are larger than GitHub's normal repository file limit. GitHub blocks files larger than 100 MB in regular git history, and release assets are the right place for distributable binaries.
 
-The local development machine currently has the model file in place, and packaged `.app` builds include it under:
+Model choices in the app:
+
+- Base: smallest and fastest option for iPhone and iPad.
+- Small: balanced option for iPhone and iPad.
+- Large v3: highest accuracy option, best suited to Mac or short mobile files.
+
+The local development machine currently has the model files in place, and packaged `.app` builds include them under:
 
 ```text
+Verbatim.app/Contents/Resources/ggml-base.bin
+Verbatim.app/Contents/Resources/ggml-small.bin
 Verbatim.app/Contents/Resources/ggml-large-v3.bin
 ```
 
@@ -100,6 +112,8 @@ The script is responsible for preparing the local Whisper dependency chain used 
 ```text
 Vendor/whisper.xcframework
 Verbatim/Verbatim/models/ggml-large-v3.bin
+Verbatim/Verbatim/models/ggml-small.bin
+Verbatim/Verbatim/models/ggml-base.bin
 ```
 
 ## Building In Xcode
@@ -140,7 +154,7 @@ xcodebuild \
 
 ## Packaging A Shareable App
 
-The app bundle is large because it contains Whisper large-v3. The packaged zip is expected to be roughly 2.7 GB.
+The app bundle is large because it contains the bundled Whisper models. The packaged zip is expected to be larger than the previous Large v3-only package.
 
 The current local package output is:
 
@@ -182,7 +196,7 @@ shasum -a 256 Verbatim.zip
 
 - The packaged app is currently ad-hoc signed, not notarized.
 - The app is being developed as an Apple-native project, but the tested packaged build is macOS.
-- Whisper large-v3 is accurate but heavy; transcription can take time on long media files.
+- Whisper Large v3 is accurate but heavy; use Base or Small for lighter iPhone/iPad runs.
 - Transcript highlighting depends on segment timing returned by Whisper.
 
 ## Roadmap

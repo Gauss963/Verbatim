@@ -8,7 +8,7 @@ enum WhisperError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .couldNotInitializeContext:
-            return "Could not initialize Whisper large-v3."
+            return "Could not initialize the Whisper model."
         case .transcriptionFailed:
             return "Whisper failed to transcribe this file."
         }

@@ -7,6 +7,11 @@ import UniformTypeIdentifiers
 final class TranscriptionViewModel {
     var files: [TranscriptFile] = []
     var language: TranscriptLanguage = .automatic
+    var selectedModel: WhisperModel = .defaultModel {
+        didSet {
+            refreshEnvironmentStatus()
+        }
+    }
     var transcript = ""
     var transcriptSegments: [TranscriptSegment] = []
     var isTranscribing = false
@@ -70,10 +75,10 @@ final class TranscriptionViewModel {
     var outputSubtitle: String {
         if isTranscribing {
             if let currentFileName {
-                return "Running Whisper large-v3 on \(currentFileName)"
+                return "Running Whisper \(selectedModel.title) on \(currentFileName)"
             }
 
-            return "Running Whisper large-v3 locally"
+            return "Running Whisper \(selectedModel.title) locally"
         }
 
         if files.isEmpty {
@@ -112,7 +117,7 @@ final class TranscriptionViewModel {
     }
 
     func refreshEnvironmentStatus() {
-        environmentStatus = transcriber.environmentStatus()
+        environmentStatus = transcriber.environmentStatus(for: selectedModel)
     }
 
     func acceptDrop(_ providers: [NSItemProvider]) -> Bool {
@@ -165,7 +170,7 @@ final class TranscriptionViewModel {
             files[index].state = .running
 
             do {
-                let result = try await transcriber.transcribe(url: files[index].url, language: language)
+                let result = try await transcriber.transcribe(url: files[index].url, language: language, model: selectedModel)
                 files[index].state = .finished
                 append(result, sourceURL: files[index].url)
             } catch {

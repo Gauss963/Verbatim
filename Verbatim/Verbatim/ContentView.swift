@@ -67,6 +67,25 @@ struct ContentView: View {
                 .labelsHidden()
             }
 
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Model")
+                    .font(.headline)
+
+                Picker("Model", selection: $model.selectedModel) {
+                    ForEach(WhisperModel.allCases) { whisperModel in
+                        Text(whisperModel.title).tag(whisperModel)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .disabled(model.isTranscribing)
+
+                Text(model.selectedModel.shortDetail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
             transcriptionControls
 
             queueSection

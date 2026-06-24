@@ -57,6 +57,48 @@ enum TranscriptLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+enum WhisperModel: String, CaseIterable, Identifiable {
+    case base = "ggml-base"
+    case small = "ggml-small"
+    case largeV3 = "ggml-large-v3"
+
+    var id: String { rawValue }
+
+    static var defaultModel: WhisperModel {
+#if os(macOS)
+        .largeV3
+#else
+        .small
+#endif
+    }
+
+    var resourceName: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .base:
+            return "Base"
+        case .small:
+            return "Small"
+        case .largeV3:
+            return "Large v3"
+        }
+    }
+
+    var shortDetail: String {
+        switch self {
+        case .base:
+            return "Fastest for iPhone and iPad"
+        case .small:
+            return "Balanced mobile model"
+        case .largeV3:
+            return "Best accuracy"
+        }
+    }
+}
+
 struct TranscriptFile: Identifiable, Equatable {
     let id = UUID()
     let url: URL
