@@ -11,6 +11,10 @@ final class PlaybackController {
 
     let player = AVPlayer()
     private var timeObserver: Any?
+    private var durationObserver: NSKeyValueObservation?
+    private var statusObserver: NSKeyValueObservation?
+    private var scopedURL: URL?
+    private var isAccessingScopedResource = false
 
     init() {
         timeObserver = player.addPeriodicTimeObserver(
@@ -33,25 +37,38 @@ final class PlaybackController {
         if let timeObserver {
             player.removeTimeObserver(timeObserver)
         }
+
+        stopAccessingScopedResource()
     }
 
     func prepare(url: URL) {
         guard currentURL != url else { return }
 
+        configureAudioSession()
+        stopAccessingScopedResource()
+        scopedURL = url
+        isAccessingScopedResource = url.startAccessingSecurityScopedResource()
+
         currentURL = url
         currentTime = 0
         duration = 0
         isPlaying = false
-        player.replaceCurrentItem(with: AVPlayerItem(url: url))
+
+        let item = AVPlayerItem(url: url)
+        observe(item)
+        player.replaceCurrentItem(with: item)
     }
 
     func reset() {
         player.pause()
         player.replaceCurrentItem(with: nil)
+        durationObserver = nil
+        statusObserver = nil
         currentURL = nil
         currentTime = 0
         duration = 0
         isPlaying = false
+        stopAccessingScopedResource()
     }
 
     func togglePlayPause() {
@@ -61,6 +78,7 @@ final class PlaybackController {
             player.pause()
             isPlaying = false
         } else {
+            configureAudioSession()
             player.play()
             isPlaying = true
         }
@@ -74,8 +92,50 @@ final class PlaybackController {
         currentTime = clamped
 
         if play {
+            configureAudioSession()
             player.play()
             isPlaying = true
         }
+    }
+
+    private func observe(_ item: AVPlayerItem) {
+        durationObserver = item.observe(\.duration, options: [.initial, .new]) { [weak self] item, _ in
+            guard let self else { return }
+
+            Task { @MainActor in
+                let seconds = item.duration.seconds
+                self.duration = seconds.isFinite ? max(0, seconds) : 0
+            }
+        }
+
+        statusObserver = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+            guard let self else { return }
+
+            Task { @MainActor in
+                if item.status == .failed {
+                    self.isPlaying = false
+                }
+            }
+        }
+    }
+
+    private func stopAccessingScopedResource() {
+        if isAccessingScopedResource {
+            scopedURL?.stopAccessingSecurityScopedResource()
+        }
+
+        scopedURL = nil
+        isAccessingScopedResource = false
+    }
+
+    private func configureAudioSession() {
+#if os(iOS)
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            assertionFailure("Could not configure audio session: \(error.localizedDescription)")
+        }
+#endif
     }
 }
