@@ -36,6 +36,14 @@ Verbatim currently accepts:
 - `.aac`
 - `.flac`
 
+## Long Recordings
+
+Long recordings are decoded in independent chunks of at most 60 seconds, with boundaries chosen near quiet gaps. Digital silence is skipped and long empty pauses separate utterances. This does not require another VAD model.
+
+Text-history conditioning is disabled both between calls and between Whisper's internal windows. Suspicious repetitive output is retried in smaller 15-second and then 5-second chunks using fresh decoder states. If decoding still fails the quality checks, the app reports the affected time instead of accepting an endless repeated transcript. Genuine repeated speech is not globally deduplicated.
+
+All segment timestamps are translated back to the original media timeline for playback and highlighting. There is no application-imposed 30-minute transcription limit, though model accuracy still depends on recording quality and the selected model. PCM audio is currently decoded into memory before inference, so very long recordings still require additional RAM.
+
 ## Requirements
 
 For development:
@@ -153,7 +161,7 @@ This downloads missing models from a pinned upstream revision, verifies their SH
 Optional version overrides:
 
 ```sh
-VERSION=1.0.3 BUILD_NUMBER=3 bash scripts/build-macos.sh
+VERSION=1.0.4 BUILD_NUMBER=4 bash scripts/build-macos.sh
 ```
 
 ## Packaging A Shareable App
@@ -189,6 +197,7 @@ The workflow uses a GitHub-hosted macOS runner with Xcode 26.3 and:
 - Restores the three Whisper models from cache or downloads them when missing.
 - Verifies every model against `scripts/models.sha256`, including cached copies.
 - Runs `scripts/build-macos.sh` to produce a verified universal Release app.
+- Runs the transcription regression suite before building.
 - Uploads the single app ZIP and checksum as an artifact named `Verbatim-macOS-<commit SHA>`.
 
 To download a build, open a successful run and select its artifact under **Artifacts**. GitHub wraps the artifact in an outer archive; extract that first, then extract the inner Verbatim ZIP to get the app. Artifacts are retained for 14 days and downloading them requires GitHub sign-in. Stable GitHub Releases remain available separately.
@@ -202,23 +211,42 @@ Do not commit the packaged app, zip, or model file into git history.
 To publish a stable release, push a version tag on the desired commit:
 
 ```sh
-git tag v1.0.3
-git push origin v1.0.3
+git tag v1.0.4
+git push origin v1.0.4
 ```
 
 The tag workflow builds the app with that version, verifies the archive, uploads all assets to a draft release, and publishes it only after uploads succeed. The tag must use `vMAJOR.MINOR.PATCH`. A failed upload leaves the release as a draft; rerunning the job retries the assets.
 
 GitHub Release assets have a per-file size limit, so the full app ZIP is split into parts smaller than 2 GiB. This restriction does not change the single-ZIP format used locally or inside Actions artifacts.
 
-Download all `.part-*` assets and both checksum files from a release into one folder. For v1.0.3, reconstruct and verify with:
+Download all `.part-*` assets and both checksum files from a release into one folder. For v1.0.4, reconstruct and verify with:
 
 ```sh
 shasum -a 256 -c SHA256SUMS.txt
-cat Verbatim-macOS-universal.zip.part-* > Verbatim-macOS-universal-v1.0.3.zip
+cat Verbatim-macOS-universal.zip.part-* > Verbatim-macOS-universal-v1.0.4.zip
 shasum -a 256 -c ZIP-SHA256SUMS.txt
 ```
 
 Extract the reconstructed ZIP normally to get `Verbatim.app`.
+
+## Transcription Tests
+
+Run focused tests for chunk coverage beyond 30 minutes, text-history settings, silence handling, recovery, retry limits, and playback timestamps:
+
+```sh
+bash scripts/test-transcription.sh
+```
+
+For a real-model integration test, first download the bundled models, then run:
+
+```sh
+bash scripts/download-models.sh
+bash scripts/test-transcription.sh --integration
+# Repeat with the highest-accuracy model:
+VERBATIM_TEST_MODEL=large-v3 bash scripts/test-transcription.sh --integration
+```
+
+The integration test generates a 31-minute WAV using the built-in macOS `say` voice, decodes it through AVFoundation, and transcribes it with Whisper Base by default (or the selected test model). It checks distinct spoken markers near a chunk boundary and after 30:00, including their original timeline positions. It runs locally without uploading audio and requires the Samantha voice. GitHub Actions runs the focused suite; the real-model test is opt-in.
 
 ## Current Limitations
 
