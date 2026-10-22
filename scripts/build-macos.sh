@@ -44,8 +44,8 @@ xattr -cr "$APP"
 codesign --force --sign - --timestamp=none "$APP/Contents/Frameworks/whisper.framework"
 codesign --force --sign - --timestamp=none "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
-lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/Verbatim"
-lipo -verify_arch arm64 x86_64 "$APP/Contents/Frameworks/whisper.framework/whisper"
+lipo "$APP/Contents/MacOS/Verbatim" -verify_arch arm64 x86_64
+lipo "$APP/Contents/Frameworks/whisper.framework/whisper" -verify_arch arm64 x86_64
 (
   cd "$APP/Contents/Resources"
   shasum -a 256 --check "${ROOT}/scripts/models.sha256"
