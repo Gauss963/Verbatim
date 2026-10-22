@@ -1,5 +1,7 @@
 # Verbatim
 
+[![Build macOS App](https://github.com/Gauss963/Verbatim/actions/workflows/macos-build.yml/badge.svg)](https://github.com/Gauss963/Verbatim/actions/workflows/macos-build.yml)
+
 Verbatim is a native SwiftUI app for local audio and video transcription with selectable Whisper models.
 
 The app is designed for private, offline-first transcription: media files stay on the device, the Whisper model runs locally, and generated transcripts can be reviewed, copied, and played back alongside the original audio or video.
@@ -140,57 +142,83 @@ xcodebuild \
   build
 ```
 
-Release build:
+For a distributable Release build, use the same script as GitHub Actions:
 
 ```sh
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild \
-  -project Verbatim/Verbatim.xcodeproj \
-  -scheme Verbatim \
-  -configuration Release \
-  -destination 'generic/platform=macOS' \
-  build
+bash scripts/build-macos.sh
+```
+
+This downloads missing models from a pinned upstream revision, verifies their SHA-256 hashes, builds both `arm64` and `x86_64`, signs the embedded framework and app with an ad-hoc signature, and verifies the finished bundle. The committed `Vendor/whisper.xcframework` is used directly; no Whisper rebuild or Apple Developer certificate is required.
+
+Optional version overrides:
+
+```sh
+VERSION=1.0.3 BUILD_NUMBER=3 bash scripts/build-macos.sh
 ```
 
 ## Packaging A Shareable App
 
-The app bundle is large because it contains the bundled Whisper models. The packaged zip is expected to be larger than the previous Large v3-only package.
-
-The current local package output is:
+All three models are included. Outputs are:
 
 ```text
-dist/Verbatim.zip
+dist/Verbatim.app
+dist/Verbatim-macOS-universal-v<VERSION>.zip
+dist/SHA256SUMS.txt
 ```
 
-Before sharing a package, verify the app after unzipping:
+The single ZIP can be sent directly to another person. They can extract it and move `Verbatim.app` into Applications. The universal app supports both Apple silicon and Intel Macs running macOS 15.7 or newer.
+
+Before sharing a package, verify the ZIP and the extracted app:
 
 ```sh
-rm -rf /tmp/verbatim-zipcheck
-mkdir -p /tmp/verbatim-zipcheck
-ditto -x -k dist/Verbatim.zip /tmp/verbatim-zipcheck
-codesign --verify --deep --strict --verbose=2 /tmp/verbatim-zipcheck/Verbatim.app
+cd dist
+shasum -a 256 -c SHA256SUMS.txt
+CHECK_DIR="$(mktemp -d)"
+ditto -x -k Verbatim-macOS-universal-v*.zip "$CHECK_DIR"
+codesign --verify --deep --strict --verbose=2 "$CHECK_DIR/Verbatim.app"
 ```
 
-This project currently uses ad-hoc signing for local builds. For a smoother public distribution experience, the app should eventually be signed with an Apple Developer ID certificate and notarized.
+This project currently uses ad-hoc signing, not Developer ID signing or notarization. A downloaded build may require explicit approval in System Settings > Privacy & Security. Do not disable Gatekeeper system-wide.
+
+## Automatic macOS Builds
+
+Every push to `main` runs [Build macOS App](https://github.com/Gauss963/Verbatim/actions/workflows/macos-build.yml). The workflow can also be started manually with **Run workflow**.
+
+The workflow uses a GitHub-hosted macOS runner with Xcode 26.3 and:
+
+- Restores the three Whisper models from cache or downloads them when missing.
+- Verifies every model against `scripts/models.sha256`, including cached copies.
+- Runs `scripts/build-macos.sh` to produce a verified universal Release app.
+- Uploads the single app ZIP and checksum as an artifact named `Verbatim-macOS-<commit SHA>`.
+
+To download a build, open a successful run and select its artifact under **Artifacts**. GitHub wraps the artifact in an outer archive; extract that first, then extract the inner Verbatim ZIP to get the app. Artifacts are retained for 14 days and downloading them requires GitHub sign-in. Stable GitHub Releases remain available separately.
+
+The workflow uses pinned action revisions, requires no signing secrets, and does not change the source branch. The build job has read-only repository access; only the release job receives permission to upload release assets.
 
 ## GitHub Releases
 
 Do not commit the packaged app, zip, or model file into git history.
 
-Use GitHub Releases for downloadable builds. Since the full app zip is larger than 2 GB, split the archive into smaller assets before uploading:
+To publish a stable release, push a version tag on the desired commit:
 
 ```sh
-mkdir -p release
-split -b 1900m dist/Verbatim.zip release/Verbatim.zip.part-
-shasum -a 256 release/Verbatim.zip.part-* > release/SHA256SUMS.txt
+git tag v1.0.3
+git push origin v1.0.3
 ```
 
-To reconstruct:
+The tag workflow builds the app with that version, verifies the archive, uploads all assets to a draft release, and publishes it only after uploads succeed. The tag must use `vMAJOR.MINOR.PATCH`. A failed upload leaves the release as a draft; rerunning the job retries the assets.
+
+GitHub Release assets have a per-file size limit, so the full app ZIP is split into parts smaller than 2 GiB. This restriction does not change the single-ZIP format used locally or inside Actions artifacts.
+
+Download all `.part-*` assets and both checksum files from a release into one folder. For v1.0.3, reconstruct and verify with:
 
 ```sh
-cat Verbatim.zip.part-* > Verbatim.zip
-shasum -a 256 Verbatim.zip
+shasum -a 256 -c SHA256SUMS.txt
+cat Verbatim-macOS-universal.zip.part-* > Verbatim-macOS-universal-v1.0.3.zip
+shasum -a 256 -c ZIP-SHA256SUMS.txt
 ```
+
+Extract the reconstructed ZIP normally to get `Verbatim.app`.
 
 ## Current Limitations
 
@@ -202,7 +230,7 @@ shasum -a 256 Verbatim.zip
 ## Roadmap
 
 - Developer ID signing and notarization.
-- A repeatable release script.
+- Developer ID signing secrets for automated releases.
 - Better progress estimates during active Whisper inference.
 - More language presets.
 - iOS/iPadOS packaging work after the local model and media import flow are tuned for those platforms.
